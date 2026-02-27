@@ -1,0 +1,239 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum RelationshipStatus {
+  single
+  divorced
+  widowed
+  other
+}
+
+enum EventStatus {
+  draft
+  published
+  closed
+  completed
+  cancelled
+}
+
+enum RegistrationStatus {
+  pending
+  approved
+  rejected
+  waitlisted
+  cancelled
+}
+
+enum EligibilityStatus {
+  eligible
+  needs_photo
+  disabled
+}
+
+enum AttendanceStatus {
+  not_arrived
+  arrived
+}
+
+enum CheckinMethod {
+  manual
+}
+
+enum MatchType {
+  romantic
+  friend
+  both
+}
+
+enum MatchStatus {
+  pending_admin_approval
+  approved
+  rejected
+}
+
+model User {
+  id                  String             @id @default(uuid()) @db.Uuid
+  fullName            String             @map("full_name")
+  phone               String             @unique
+  email               String             @unique
+  birthDate           DateTime           @map("birth_date") @db.Date
+  gender              Gender
+  relationshipStatus  RelationshipStatus @map("relationship_status")
+  facebookUrl         String             @map("facebook_url")
+  instagramUrl        String?            @map("instagram_url")
+  aboutText           String             @map("about_text")
+  lookingForText      String             @map("looking_for_text")
+  profilePhotoUrl     String?            @map("profile_photo_url")
+  consentFlags        Json               @default("{}") @map("consent_flags")
+  isAdmin             Boolean            @default(false) @map("is_admin")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  registrations       Registration[]
+  participants        EventParticipant[]
+  attendances         Attendance[]
+  choicesFrom         Choice[]           @relation("ChoiceFrom")
+  choicesTo           Choice[]           @relation("ChoiceTo")
+  matchesA            Match[]            @relation("MatchUserA")
+  matchesB            Match[]            @relation("MatchUserB")
+  auditLogs           AdminAuditLog[]
+
+  @@map("users")
+}
+
+model Event {
+  id                   String      @id @default(uuid()) @db.Uuid
+  title                String
+  description          String?
+  coverImageUrl        String      @map("cover_image_url")
+  coverImageWidth      Int         @default(1920) @map("cover_image_width")
+  coverImageHeight     Int         @default(1080) @map("cover_image_height")
+  startsAt             DateTime    @map("starts_at")
+  endsAt               DateTime    @map("ends_at")
+  locationName         String      @map("location_name")
+  locationAddress      String?     @map("location_address")
+  capacityTotal        Int         @map("capacity_total")
+  capacityMale         Int?        @map("capacity_male")
+  capacityFemale       Int?        @map("capacity_female")
+  registrationOpenAt   DateTime    @map("registration_open_at")
+  registrationCloseAt  DateTime    @map("registration_close_at")
+  selectionOpenAt      DateTime?   @map("selection_open_at")
+  selectionCloseAt     DateTime?   @map("selection_close_at")
+  status               EventStatus @default(draft)
+  createdByAdminId     String      @map("created_by_admin_id") @db.Uuid
+  createdAt            DateTime    @default(now()) @map("created_at")
+  updatedAt            DateTime    @updatedAt @map("updated_at")
+
+  registrations        Registration[]
+  participants         EventParticipant[]
+  attendances          Attendance[]
+  choices              Choice[]
+  matches              Match[]
+  auditLogs            AdminAuditLog[]
+
+  @@map("events")
+}
+
+model Registration {
+  id                   String             @id @default(uuid()) @db.Uuid
+  eventId              String             @map("event_id") @db.Uuid
+  userId               String             @map("user_id") @db.Uuid
+  status               RegistrationStatus @default(pending)
+  approvedRequiresPhoto Boolean           @default(false) @map("approved_requires_photo")
+  adminNote            String?            @map("admin_note")
+  submittedAt          DateTime           @default(now()) @map("submitted_at")
+  reviewedAt           DateTime?          @map("reviewed_at")
+  reviewedByAdminId    String?            @map("reviewed_by_admin_id") @db.Uuid
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  event                Event              @relation(fields: [eventId], references: [id])
+  user                 User               @relation(fields: [userId], references: [id])
+
+  @@unique([eventId, userId])
+  @@map("registrations")
+}
+
+model EventParticipant {
+  id               String            @id @default(uuid()) @db.Uuid
+  eventId          String            @map("event_id") @db.Uuid
+  userId           String            @map("user_id") @db.Uuid
+  displayName      String            @map("display_name")
+  displayPhotoUrl  String?           @map("display_photo_url")
+  gender           Gender
+  eligibilityStatus EligibilityStatus @map("eligibility_status")
+  createdAt        DateTime          @default(now()) @map("created_at")
+
+  event            Event             @relation(fields: [eventId], references: [id])
+  user             User              @relation(fields: [userId], references: [id])
+
+  @@unique([eventId, userId])
+  @@map("event_participants")
+}
+
+model Attendance {
+  id                   String          @id @default(uuid()) @db.Uuid
+  eventId              String          @map("event_id") @db.Uuid
+  userId               String          @map("user_id") @db.Uuid
+  status               AttendanceStatus @default(not_arrived)
+  checkinTime          DateTime?       @map("checkin_time")
+  checkedInByAdminId   String?         @map("checked_in_by_admin_id") @db.Uuid
+  method               CheckinMethod   @default(manual)
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+
+  event                Event           @relation(fields: [eventId], references: [id])
+  user                 User            @relation(fields: [userId], references: [id])
+
+  @@unique([eventId, userId])
+  @@map("attendances")
+}
+
+model Choice {
+  id                 String    @id @default(uuid()) @db.Uuid
+  eventId            String    @map("event_id") @db.Uuid
+  fromUserId         String    @map("from_user_id") @db.Uuid
+  toUserId           String    @map("to_user_id") @db.Uuid
+  interestedRomantic Boolean?  @map("interested_romantic")
+  interestedFriend   Boolean?  @map("interested_friend")
+  notInterested      Boolean?  @map("not_interested")
+  submittedAt        DateTime? @map("submitted_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  event              Event     @relation(fields: [eventId], references: [id])
+  fromUser           User      @relation("ChoiceFrom", fields: [fromUserId], references: [id])
+  toUser             User      @relation("ChoiceTo", fields: [toUserId], references: [id])
+
+  @@unique([eventId, fromUserId, toUserId])
+  @@map("choices")
+}
+
+model Match {
+  id                  String      @id @default(uuid()) @db.Uuid
+  eventId             String      @map("event_id") @db.Uuid
+  userAId             String      @map("user_a_id") @db.Uuid
+  userBId             String      @map("user_b_id") @db.Uuid
+  matchType           MatchType   @map("match_type")
+  status              MatchStatus @default(pending_admin_approval)
+  createdAt           DateTime    @default(now()) @map("created_at")
+  reviewedAt          DateTime?   @map("reviewed_at")
+  reviewedByAdminId   String?     @map("reviewed_by_admin_id") @db.Uuid
+  reviewNote          String?     @map("review_note")
+  notifiedAt          DateTime?   @map("notified_at")
+
+  event               Event       @relation(fields: [eventId], references: [id])
+  userA               User        @relation("MatchUserA", fields: [userAId], references: [id])
+  userB               User        @relation("MatchUserB", fields: [userBId], references: [id])
+
+  @@map("matches")
+}
+
+model AdminAuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  eventId     String?  @map("event_id") @db.Uuid
+  adminId     String   @map("admin_id") @db.Uuid
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id") @db.Uuid
+  metaJson    Json     @default("{}") @map("meta_json")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  event       Event?   @relation(fields: [eventId], references: [id])
+  admin       User     @relation(fields: [adminId], references: [id])
+
+  @@map("admin_audit_logs")
+}

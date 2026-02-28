@@ -1,14 +1,15 @@
 import {
   Injectable,
-  BadRequestException,
   UnauthorizedException,
+  ConflictException,
   Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
-import { OtpService } from './otp.service';
-import { RequestOtpDto } from './dto/request-otp.dto';
-import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { AdminLoginDto } from './dto/admin-login.dto';
+import { UserLoginDto } from './dto/user-login.dto';
+import { UserRegisterDto } from './dto/user-register.dto';
 
 @Injectable()
 export class AuthService {
@@ -17,52 +18,79 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
-    private otpService: OtpService,
   ) {}
 
-  async requestOtp(dto: RequestOtpDto): Promise<{ message: string }> {
-    const phone = this.normalizePhone(dto.phone);
-    const code = this.otpService.generateOtp(phone);
+  /** Admin login: username + password */
+  async adminLogin(dto: AdminLoginDto): Promise<{ token: string; user: any }> {
+    const user = await this.prisma.user.findFirst({
+      where: { username: dto.username, isAdmin: true },
+    });
 
-    // In production: send via SMS provider
-    this.logger.log(`[SMS] Sending OTP ${code} to ${phone}`);
-    // TODO: integrate SMS provider (Twilio, etc.)
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('שם משתמש או סיסמא שגויים');
+    }
 
-    return { message: 'OTP sent successfully' };
+    const valid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('שם משתמש או סיסמא שגויים');
+    }
+
+    this.logger.log(`Admin login: ${user.username}`);
+    return this.buildTokenResponse(user);
   }
 
-  async verifyOtp(dto: VerifyOtpDto): Promise<{ token: string; user: any }> {
-    const phone = this.normalizePhone(dto.phone);
-    const isValid = this.otpService.verifyOtp(phone, dto.code);
+  /** Participant login: email + password */
+  async userLogin(dto: UserLoginDto): Promise<{ token: string; user: any }> {
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
 
-    if (!isValid) {
-      throw new UnauthorizedException('Invalid or expired OTP');
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('אימייל או סיסמא שגויים');
     }
 
-    // Find or create user
-    let user = await this.prisma.user.findUnique({ where: { phone } });
-
-    if (!user) {
-      // First-time login: create a minimal user record
-      user = await this.prisma.user.create({
-        data: {
-          phone,
-          fullName: '',
-          email: `${phone}@temp.speeddating.app`,
-          birthDate: new Date('2000-01-01'),
-          gender: 'other',
-          relationshipStatus: 'single',
-          facebookUrl: '',
-          aboutText: '',
-          lookingForText: '',
-          consentFlags: {},
-        },
-      });
+    if (user.isAdmin) {
+      throw new UnauthorizedException('מנהלים נכנסים דרך כניסת מנהלת');
     }
 
+    const valid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('אימייל או סיסמא שגויים');
+    }
+
+    this.logger.log(`User login: ${user.email}`);
+    return this.buildTokenResponse(user);
+  }
+
+  /** Participant registration: email + password (no email verification) */
+  async userRegister(dto: UserRegisterDto): Promise<{ token: string; user: any }> {
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (existing) {
+      throw new ConflictException('כתובת האימייל כבר רשומה במערכת');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    const user = await this.prisma.user.create({
+      data: {
+        fullName: dto.fullName,
+        email: dto.email,
+        passwordHash,
+        consentFlags: {},
+      },
+    });
+
+    this.logger.log(`New user registered: ${user.email}`);
+    return this.buildTokenResponse(user);
+  }
+
+  private buildTokenResponse(user: any) {
     const payload = {
       sub: user.id,
-      phone: user.phone,
+      email: user.email,
       isAdmin: user.isAdmin,
     };
 
@@ -72,15 +100,11 @@ export class AuthService {
       token,
       user: {
         id: user.id,
-        phone: user.phone,
+        email: user.email,
         fullName: user.fullName,
         isAdmin: user.isAdmin,
+        username: user.username ?? undefined,
       },
     };
-  }
-
-  private normalizePhone(phone: string): string {
-    // Basic normalization: remove spaces, dashes, etc.
-    return phone.replace(/[\s\-\(\)]/g, '');
   }
 }

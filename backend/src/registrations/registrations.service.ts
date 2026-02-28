@@ -36,41 +36,41 @@ export class RegistrationsService {
       throw new BadRequestException('Registration is not open for this event');
     }
 
-    // Find or create user from phone/email
+    // Find or create user — prefer matching by email, then phone
     let user = await this.prisma.user.findFirst({
-      where: { OR: [{ phone: dto.phone }, { email: dto.email }] },
+      where: {
+        OR: [
+          { email: dto.email },
+          ...(dto.phone ? [{ phone: dto.phone }] : []),
+        ],
+      },
     });
+
+    const profileData = {
+      fullName: dto.fullName,
+      phone: dto.phone || null,
+      birthDate: new Date(dto.birthDate),
+      gender: dto.gender,
+      relationshipStatus: dto.relationshipStatus,
+      facebookUrl: dto.facebookUrl || null,
+      instagramUrl: dto.instagramUrl || null,
+      aboutText: dto.aboutText,
+      lookingForText: dto.lookingForText,
+    };
 
     if (!user) {
       user = await this.prisma.user.create({
         data: {
-          fullName: dto.fullName,
-          phone: dto.phone,
+          ...profileData,
           email: dto.email,
-          birthDate: new Date(dto.birthDate),
-          gender: dto.gender,
-          relationshipStatus: dto.relationshipStatus,
-          facebookUrl: dto.facebookUrl,
-          instagramUrl: dto.instagramUrl,
-          aboutText: dto.aboutText,
-          lookingForText: dto.lookingForText,
           consentFlags: { termsAccepted: true, termsAcceptedAt: now.toISOString() },
         },
       });
     } else {
-      // Update user data
+      // Update profile data for existing user
       user = await this.prisma.user.update({
         where: { id: user.id },
-        data: {
-          fullName: dto.fullName,
-          birthDate: new Date(dto.birthDate),
-          gender: dto.gender,
-          relationshipStatus: dto.relationshipStatus,
-          facebookUrl: dto.facebookUrl,
-          instagramUrl: dto.instagramUrl,
-          aboutText: dto.aboutText,
-          lookingForText: dto.lookingForText,
-        },
+        data: profileData,
       });
     }
 

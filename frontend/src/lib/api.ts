@@ -36,10 +36,12 @@ api.interceptors.response.use(
 
 // Auth APIs
 export const authApi = {
-  requestOtp: (phone: string) =>
-    api.post('/auth/request-otp', { phone }).then((r) => r.data),
-  verifyOtp: (phone: string, code: string) =>
-    api.post('/auth/verify-otp', { phone, code }).then((r) => r.data),
+  adminLogin: (username: string, password: string) =>
+    api.post('/auth/admin/login', { username, password }).then((r) => r.data),
+  userLogin: (email: string, password: string) =>
+    api.post('/auth/login', { email, password }).then((r) => r.data),
+  userRegister: (fullName: string, email: string, password: string) =>
+    api.post('/auth/register', { fullName, email, password }).then((r) => r.data),
 };
 
 // Events (Public)

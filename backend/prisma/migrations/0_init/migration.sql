@@ -29,15 +29,17 @@ CREATE TYPE "MatchStatus" AS ENUM ('pending_admin_approval', 'approved', 'reject
 CREATE TABLE "users" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "full_name" TEXT NOT NULL,
-    "phone" TEXT NOT NULL,
+    "username" TEXT,
+    "password_hash" TEXT,
+    "phone" TEXT,
     "email" TEXT NOT NULL,
-    "birth_date" DATE NOT NULL,
-    "gender" "Gender" NOT NULL,
-    "relationship_status" "RelationshipStatus" NOT NULL,
-    "facebook_url" TEXT NOT NULL,
+    "birth_date" DATE,
+    "gender" "Gender",
+    "relationship_status" "RelationshipStatus",
+    "facebook_url" TEXT,
     "instagram_url" TEXT,
-    "about_text" TEXT NOT NULL,
-    "looking_for_text" TEXT NOT NULL,
+    "about_text" TEXT,
+    "looking_for_text" TEXT,
     "profile_photo_url" TEXT,
     "consent_flags" JSONB NOT NULL DEFAULT '{}',
     "is_admin" BOOLEAN NOT NULL DEFAULT false,
@@ -179,7 +181,8 @@ CREATE TABLE "admin_audit_logs" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_phone_key" ON "users"("phone");
+CREATE UNIQUE INDEX "users_username_key" ON "users"("username") WHERE "username" IS NOT NULL;
+CREATE UNIQUE INDEX "users_phone_key" ON "users"("phone") WHERE "phone" IS NOT NULL;
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 CREATE UNIQUE INDEX "registrations_event_id_user_id_key" ON "registrations"("event_id", "user_id");
 CREATE UNIQUE INDEX "event_participants_event_id_user_id_key" ON "event_participants"("event_id", "user_id");

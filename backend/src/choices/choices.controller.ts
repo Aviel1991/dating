@@ -9,7 +9,6 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
-  IsOptional,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ChoicesService } from './choices.service';

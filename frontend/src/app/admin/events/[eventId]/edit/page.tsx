@@ -14,7 +14,7 @@ export default function EditEventPage() {
 
   useEffect(() => {
     // Fetch event details for admin
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/events/${eventId}`, {
+    fetch(`/api/events/${eventId}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
     })
       .then((r) => r.json())

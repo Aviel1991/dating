@@ -49,7 +49,7 @@ export default function ParticipantsPage() {
   const handleExportCsv = () => {
     const token = localStorage.getItem('auth_token');
     window.open(
-      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/admin/events/${eventId}/participants/export.csv`,
+      `/api/admin/events/${eventId}/participants/export.csv`,
       '_blank',
     );
   };

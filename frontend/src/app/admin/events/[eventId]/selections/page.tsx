@@ -15,7 +15,7 @@ export default function AdminSelectionsPage() {
   const [acting, setActing] = useState(false);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/events/${eventId}`, {
+    fetch(`/api/events/${eventId}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
     })
       .then((r) => r.json())
